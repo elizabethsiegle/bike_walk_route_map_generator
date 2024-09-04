@@ -62,9 +62,9 @@ st.markdown(markdown_content)
 
 # Load environment variables
 load_dotenv()
-mapbox_token = os.environ.get('MAPBOX_TOKEN')
-cf_account_id = os.environ.get('CLOUDFLARE_ACCOUNT_ID')
-cf_api_token = os.environ.get('CLOUDFLARE_API_TOKEN')
+mapbox_token = st.secrets["MAPBOX_TOKEN"] # os.environ.get('MAPBOX_TOKEN')
+cf_account_id = st.secrets["CLOUDFLARE_ACCOUNT_ID"]# os.environ.get('CLOUDFLARE_ACCOUNT_ID')
+cf_api_token = st.secrets["CLOUDFLARE_API_TOKEN"] # os.environ.get('CLOUDFLARE_API_TOKEN')
 
 token = str(uuid.uuid4())
 
