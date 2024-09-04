@@ -18,7 +18,7 @@ import folium
 from streamlit_folium import folium_static
 
 # Display the title and description
-st.title('Route Me')
+st.title('Route Me🚴‍♀️🚶‍♀️‍➡️🏃‍♀️')
 
 st.markdown("""
     <style>
@@ -51,12 +51,13 @@ st.markdown(footer_html, unsafe_allow_html=True)
 
 # Define markdown content directly
 markdown_content = """
-This app uses Cloudflare Workers AI, LangChain, and location data from Mapbox to tackle the Travelling Salesman problem!
+This app uses [Cloudflare Workers AI](https://developers.cloudflare.com/workers-ai/), [LangChain](https://langchain.dev/),  location data/maps from [Folium](https://python-visualization.github.io/folium/latest/), and [Streamlit](https://streamlit.io/)/[Streamlit Folium](https://folium.streamlit.app/) to tackle the Traveling Salesman problem!
 
-1. Enter a city you wish to visit
+1. Enter a city🏙️ you wish to visit
 -> get 7 must-visit landmarks in your chosen city
-2. Pick the landmarks you want to visit.
+2. Pick the landmarks🌁🗽 you want to visit.
 3. Generate the shortest path between these landmarks.
+4. Explore! 🗺️
 """
 st.markdown(markdown_content)
 
