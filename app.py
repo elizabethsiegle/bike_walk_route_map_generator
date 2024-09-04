@@ -223,7 +223,7 @@ def create_route_map(landmarks, optimized_coords):
     if optimized_coords:
         folium.PolyLine(
             optimized_coords,
-            weight=3,
+            weight=6,
             color='red',
             opacity=0.8
         ).add_to(m)
@@ -292,7 +292,8 @@ def create_route_map(landmarks, optimized_coords):
     for _, row in landmarks.iterrows():
         folium.Marker(
             [row['latitude'], row['longitude']],
-            popup=row['Name']
+            popup=row['Name'],
+            tooltip=row['Name']
         ).add_to(m)
     
     # Add the optimized route line if coordinates are available
@@ -376,3 +377,13 @@ if 'route' in st.session_state and st.session_state.route:
         file_name='cf-workers-ai-tourist-route.html',
         mime='text/html'
     )
+st.markdown('</div>', unsafe_allow_html=True)
+# Footer HTML
+footer_html = """
+    <div class="footer">
+        Made with ❤️ in SF🌉
+    </div>
+"""
+
+# Inject the footer into the app
+st.markdown(footer_html, unsafe_allow_html=True)
