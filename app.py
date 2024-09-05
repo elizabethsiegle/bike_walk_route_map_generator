@@ -138,7 +138,7 @@ def lmchain():
     outp_parser = CommaSeparatedListOutputParser()
     form_instructions = outp_parser.get_format_instructions()
     
-    llm = CloudflareWorkersAI(account_id=cf_account_id, api_token=cf_api_token)
+    llm = CloudflareWorkersAI(account_id=cf_account_id, api_token=cf_api_token, model='@cf/meta/llama-3.1-8b-instruct',)
     prompt = PromptTemplate(
         template="""Return a comma-separated list of the 7 best landmarks in {city}. Only return the list. {form_instructions}""",
         input_variables=["city"],
