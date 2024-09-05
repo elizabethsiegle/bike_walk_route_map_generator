@@ -8,13 +8,13 @@ from langchain_community.llms.cloudflare_workersai import CloudflareWorkersAI
 import markdown
 import os
 import pandas as pd
-import polyline
 import requests
 import streamlit as st
 from streamlit_searchbox import st_searchbox
 from typing import List
 import uuid
 import folium
+from folium.plugins import Draw
 from streamlit_folium import folium_static
 
 # Display the title and description
@@ -42,7 +42,7 @@ st.markdown("""
 # Footer HTML
 footer_html = """
     <div class="footer">
-        Made with ❤️ in SF🌉
+        Made with ❤️ in SF🌉 with Cloudflare Workers AI ➡️ 👩🏻‍💻 <a href="https://github.com/elizabethsiegle/bike_walk_route_map_generator">code here on GitHub</a>
     </div>
 """
 
@@ -51,7 +51,7 @@ st.markdown(footer_html, unsafe_allow_html=True)
 
 # Define markdown content directly
 markdown_content = """
-This app uses [Cloudflare Workers AI](https://developers.cloudflare.com/workers-ai/), [LangChain](https://langchain.dev/),  location data/maps from [Folium](https://python-visualization.github.io/folium/latest/), and [Streamlit](https://streamlit.io/)/[Streamlit Folium](https://folium.streamlit.app/) to tackle the Traveling Salesman problem!
+This app uses [Cloudflare Workers AI](https://developers.cloudflare.com/workers-ai/), [LangChain](https://langchain.dev/),  landmark/city data from Mapbox, [Folium](https://python-visualization.github.io/folium/latest/) for visualizing maps and routes, and [Streamlit](https://streamlit.io/)/[Streamlit Folium](https://folium.streamlit.app/) to tackle the Traveling Salesman problem!
 
 1. Enter a city🏙️ you wish to visit
 -> get 7 must-visit landmarks in your chosen city
@@ -74,6 +74,7 @@ def find_city(city_inp: str) -> List[tuple]:
     if len(city_inp) < 3:
         return []
     
+    # searchbox api = return list of suggestions for city
     url = "https://api.mapbox.com/search/searchbox/v1/suggest"
     params = {"q": city_inp, "access_token": mapbox_token, "session_token": token, "types": "place"}
     
@@ -170,6 +171,7 @@ def travelingsalesman(chosen_landmarks):
     profile = "mapbox/cycling"
     coordinates = ";".join([f"{row['longitude']},{row['latitude']}" for _, row in chosen_landmarks.iterrows()])
     
+    # optimized trips API -> optimized route to hit all landmarks
     url = f"https://api.mapbox.com/optimized-trips/v1/{profile}/{coordinates}"
     params = {"access_token": mapbox_token, "geometries": "geojson"}  # Request GeoJSON format
     
@@ -212,6 +214,7 @@ def create_route_map(landmarks, optimized_coords):
     center_lon = sum(all_lons) / len(all_lons)
     
     m = folium.Map(location=[center_lat, center_lon], zoom_start=12)
+    Draw(export=True).add_to(m)
     
     # Add markers for each landmark
     for _, row in landmarks.iterrows():
