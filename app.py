@@ -54,7 +54,7 @@ markdown_content = """
 This app uses [Cloudflare Workers AI](https://developers.cloudflare.com/workers-ai/), [LangChain](https://langchain.dev/),  landmark/city data from Mapbox, [Folium](https://python-visualization.github.io/folium/latest/) for visualizing maps and routes, and [Streamlit](https://streamlit.io/)/[Streamlit Folium](https://folium.streamlit.app/) to tackle the Traveling Salesman problem!
 
 1. Enter a city🏙️ you wish to visit
--> get 7 must-visit landmarks in your chosen city
+-> get a few must-visit landmarks in your chosen city
 2. Pick the landmarks🌁🗽 you want to visit.
 3. Generate the shortest path between these landmarks.
 4. Explore! 🗺️
@@ -313,7 +313,6 @@ def create_route_map(landmarks, optimized_coords):
     
     return m
 
-# Update the main app logic
 # Update the main app logic
 if city_id:
     city = retrieve_city(city_id)
