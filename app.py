@@ -79,24 +79,23 @@ def find_city(city_inp: str) -> List[tuple]:
     if len(city_inp) < 3:
         return []
     
-    # searchbox api = return list of suggestions for city
-    url = "https://api.mapbox.com/search/searchbox/v1/suggest"
-    params = {"q": city_inp, "access_token": mapbox_token, "session_token": token, "types": "place"}
-    
-    res = requests.get(url, params=params)
-    if res.status_code != 200:
-        return []
-    
-    try:
-        suggestions = res.json().get('suggestions', [])
-        results = []
-        for s in suggestions:
-            results.append((f"{s['name']}, {s['place_formatted']}", s['mapbox_id']))
+    with st.spinner('Fetching city suggestions...'):
+        # Searchbox API = return list of suggestions for city
+        url = "https://api.mapbox.com/search/searchbox/v1/suggest"
+        params = {"q": city_inp, "access_token": mapbox_token, "session_token": token, "types": "place"}
+        
+        try:
+            res = requests.get(url, params=params)
+            res.raise_for_status()  # Will raise an HTTPError for bad responses (4xx and 5xx)
+            
+            suggestions = res.json().get('suggestions', [])
+            results = [(f"{s['name']}, {s['place_formatted']}", s['mapbox_id']) for s in suggestions]
+            
+            return results
+        except requests.RequestException as e:
+            st.error(f"Error fetching city suggestions: {e}")
+            return []
 
-        return results
-    except Exception as e:
-        st.error(f"Error fetching city suggestions: {e}")
-        return []
 
 # Function to retrieve city details
 @st.cache_data
