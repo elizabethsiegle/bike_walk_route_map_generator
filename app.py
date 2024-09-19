@@ -33,6 +33,7 @@ st.markdown("""
             color: #000;
             font-size: 14px;
             box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+            z-index: 1000;
         }
         .content {
             padding-bottom: 150px; /* Adjust this value to create space between content and footer */
@@ -51,13 +52,13 @@ st.markdown(footer_html, unsafe_allow_html=True)
 
 # Define markdown content directly
 markdown_content = """
-Diese App nutzt [Cloudflare Workers AI](https://developers.cloudflare.com/workers-ai/), [LangChain](https://langchain.dev/), Landmark- und Stadtdaten von Mapbox sowie [Folium](https://python-visualization.github.io/folium/latest/) zur Visualisierung von Karten und Routen. Mit [Streamlit](https://streamlit.io/) und [Streamlit Folium](https://folium.streamlit.app/) wird das Problem des Handlungsreisenden gelöst.
+This app uses [Cloudflare Workers AI](https://developers.cloudflare.com/workers-ai/), [LangChain](https://langchain.dev/), landmark and city data from [Nominatim](https://nominatim.openstreetmap.org/), [Mapbox](https://www.mapbox.com/), and [Folium](https://python-visualization.github.io/folium/latest/) for visualizing maps and routes. With [Streamlit](https://streamlit.io/) and [Streamlit Folium](https://folium.streamlit.app/), the traveling salesman problem is solved.
 
-1. Wähle eine Stadt🏙️ aus, die du besuchen möchtest.
-   -> Erhalte Vorschläge für wichtige Sehenswürdigkeiten.
-2. Bestimme die Sehenswürdigkeiten🌁🗽, die du besuchen willst.
-3. Erzeuge die optimale Route zwischen diesen Orten.
-4. Starte deine Entdeckungsreise! 🗺️
+1. Choose a city🏙️ you want to visit.
+   -> Get suggestions for key landmarks.
+2. Determine the landmarks🌁🗽 you want to visit.
+3. Generate the optimal route between these locations.
+4. Start your discovery journey! 🗺️
 """
 st.markdown(markdown_content)
 
@@ -76,11 +77,11 @@ token = str(uuid.uuid4())
 
 # find cities
 def find_city(city_inp: str) -> List[tuple]:
+    
     if len(city_inp) < 3:
         return []
     
     with st.spinner('Fetching city suggestions...'):
-        # Searchbox API = return list of suggestions for city
         url = "https://api.mapbox.com/search/searchbox/v1/suggest"
         params = {"q": city_inp, "access_token": mapbox_token, "session_token": token, "types": "place"}
         
@@ -110,6 +111,7 @@ def retrieve_city(id):
         if not features:
             st.warning("No features returned for the city.")
             return []
+        
         return features[0]
     except Exception as e:
         st.error(f"An error occurred: {e}")
@@ -132,19 +134,26 @@ def retrieve_city(id):
 #         return []
 
 @st.cache_data
-def retrieve_landmark(name, proximity):
-    # Nominatim API endpoint
+def retrieve_landmark(name, city_bbox):
     nominatim_url = "https://nominatim.openstreetmap.org/search"
-    params = {"q": name, "format": "json", "limit": 1  }
-    headers = {
-    "User-Agent": "Mozilla/5.0 (compatible; AcmeInc/1.0)"  # Use your app's name and version
+    
+    min_lon, min_lat, max_lon, max_lat = city_bbox
+    
+    params = {
+        "q": name,
+        "format": "json",
+        "limit": 1,  # Adjust limit if more results are needed
+        "viewbox": f"{min_lon},{max_lat},{max_lon},{min_lat}",  # Bounding box in (min_lon, max_lat, max_lon, min_lat) format
+        "bounded": 1  # Restrict results to within the bounding box
     }
-
+    headers = {
+        "User-Agent": "Mozilla/5.0 (compatible; AcmeInc/1.0)"  # Use your app's name and version
+    }
     res = requests.get(nominatim_url, params=params, headers=headers)
 
     if res.status_code != 200:
         return []
-        
+
     try:
         return res.json()
     except Exception as e:
@@ -162,7 +171,7 @@ def lmchain():
     
     llm = CloudflareWorkersAI(account_id=cf_account_id, api_token=cf_api_token, model='@cf/meta/llama-3.1-8b-instruct',)
     prompt = PromptTemplate(
-        template="""Return a comma-separated list of the 10 best landmarks in {city}. Only return the list. {form_instructions}""",
+        template="""Return a comma-separated list of the 20 best landmarks in {city}. Only return the list. {form_instructions}""",
         input_variables=["city"],
         partial_variables={"form_instructions": form_instructions},
     )
@@ -172,23 +181,22 @@ def lmchain():
 
 # Function to get landmark locations
 @st.cache_data
-def get_landmarks(landmarks, long_city, lat_city):
+def get_landmarks(landmarks, long_city, lat_city, city_bbox):
     data = []
     for lm in landmarks:
-        features = retrieve_landmark(lm, f"{long_city},{lat_city}")
+        features = retrieve_landmark(lm, city_bbox)
         if not features:
             continue
         
         # coor = features['geometry']['coordinates']
         # long, lat = coor
-        print("features", features[0])
         lat = features[0].get('lat')
         long = features[0].get('lon')
-    
         
         dist = distance.distance((lat_city, long_city), (lat, long)).km
         
-        if dist <= 7:
+        # Include landmarks within 10 km from the city center
+        if dist <= 12:
             data.append([lm, long, lat, True])
     
     return pd.DataFrame(data=data, columns=['Name', 'longitude', 'latitude', 'Include'])
@@ -343,13 +351,14 @@ def create_route_map(landmarks, optimized_coords):
 # Update the main app logic
 if city_id:
     city = retrieve_city(city_id)
+    
     if city:
         coords = city['geometry']['coordinates']
         long, lat = coords
         landmarks = lmchain().run({"city": city['properties']['full_address']})
         
         # if 'landmark_locations' not in st.session_state:
-        st.session_state.landmark_locations = get_landmarks(landmarks, long, lat)
+        st.session_state.landmark_locations = get_landmarks(landmarks, long, lat, city['properties']['bbox'])
 
         user_inp = st.data_editor(
             st.session_state.landmark_locations,
