@@ -18,7 +18,7 @@ from folium.plugins import Draw
 from streamlit_folium import folium_static
 
 # Display the title and description
-st.title('Route Me🚴‍♀️🚶‍♀️‍➡️🏃‍♀️')
+st.title('Route Minds🚴‍♀️🚶‍♀️‍➡️🏃‍♀️')
 
 st.markdown("""
     <style>
@@ -42,7 +42,7 @@ st.markdown("""
 # Footer HTML
 footer_html = """
     <div class="footer">
-        Made with ❤️ in SF🌉 with Cloudflare Workers AI ➡️ 👩🏻‍💻 <a href="https://github.com/elizabethsiegle/bike_walk_route_map_generator">code here on GitHub</a>
+        Made with ❤️ at DigiLabs👨‍💻
     </div>
 """
 
@@ -51,21 +51,26 @@ st.markdown(footer_html, unsafe_allow_html=True)
 
 # Define markdown content directly
 markdown_content = """
-This app uses [Cloudflare Workers AI](https://developers.cloudflare.com/workers-ai/), [LangChain](https://langchain.dev/),  landmark/city data from Mapbox, [Folium](https://python-visualization.github.io/folium/latest/) for visualizing maps and routes, and [Streamlit](https://streamlit.io/)/[Streamlit Folium](https://folium.streamlit.app/) to tackle the Traveling Salesman problem!
+Diese App nutzt [Cloudflare Workers AI](https://developers.cloudflare.com/workers-ai/), [LangChain](https://langchain.dev/), Landmark- und Stadtdaten von Mapbox sowie [Folium](https://python-visualization.github.io/folium/latest/) zur Visualisierung von Karten und Routen. Mit [Streamlit](https://streamlit.io/) und [Streamlit Folium](https://folium.streamlit.app/) wird das Problem des Handlungsreisenden gelöst.
 
-1. Enter a city🏙️ you wish to visit
--> get a few must-visit landmarks in your chosen city
-2. Pick the landmarks🌁🗽 you want to visit.
-3. Generate the shortest path between these landmarks.
-4. Explore! 🗺️
+1. Wähle eine Stadt🏙️ aus, die du besuchen möchtest.
+   -> Erhalte Vorschläge für wichtige Sehenswürdigkeiten.
+2. Bestimme die Sehenswürdigkeiten🌁🗽, die du besuchen willst.
+3. Erzeuge die optimale Route zwischen diesen Orten.
+4. Starte deine Entdeckungsreise! 🗺️
 """
 st.markdown(markdown_content)
 
 # Load environment variables
-load_dotenv()
-mapbox_token = st.secrets["MAPBOX_TOKEN"] # os.environ.get('MAPBOX_TOKEN')
-cf_account_id = st.secrets["CLOUDFLARE_ACCOUNT_ID"]# os.environ.get('CLOUDFLARE_ACCOUNT_ID')
-cf_api_token = st.secrets["CLOUDFLARE_API_TOKEN"] # os.environ.get('CLOUDFLARE_API_TOKEN')
+load_dotenv('.local.env')
+
+# mapbox_token = st.secrets["MAPBOX_TOKEN"] # os.environ.get('MAPBOX_TOKEN')
+# cf_account_id = st.secrets["CLOUDFLARE_ACCOUNT_ID"]# os.environ.get('CLOUDFLARE_ACCOUNT_ID')
+# cf_api_token = st.secrets["CLOUDFLARE_API_TOKEN"] # os.environ.get('CLOUDFLARE_API_TOKEN')
+
+mapbox_token = os.getenv('MAPBOX_TOKEN')
+cf_account_id = os.getenv('CLOUDFLARE_ACCOUNT_ID')
+cf_api_token = os.getenv('CLOUDFLARE_API_TOKEN')
 
 token = str(uuid.uuid4())
 
@@ -86,7 +91,6 @@ def find_city(city_inp: str) -> List[tuple]:
         suggestions = res.json().get('suggestions', [])
         results = []
         for s in suggestions:
-            print(f"s[name] {s['name']} s[place_formatted] {s['place_formatted']}")
             results.append((f"{s['name']}, {s['place_formatted']}", s['mapbox_id']))
 
         return results
@@ -113,18 +117,37 @@ def retrieve_city(id):
         return []
 
 # Function to retrieve landmark details
+# @st.cache_data
+# def retrieve_landmark(name, proximity):
+#     mapbox_url = "https://api.mapbox.com/search/searchbox/v1/forward"
+#     params = {"access_token": mapbox_token, "q": name, "proximity": proximity, 'types': 'poi', 'poi_category': 'tourist_attraction,museum,monument,historic,park,church,place_of_worship'}
+    
+#     res = requests.get(mapbox_url, params=params)
+#     if res.status_code != 200:
+#         return []
+    
+#     try:
+#         return res.json()['features'][0]
+#     except Exception as e:
+#         print(f"Error retrieving landmark: {e}")
+#         return []
+
 @st.cache_data
 def retrieve_landmark(name, proximity):
-    mapbox_url = "https://api.mapbox.com/search/searchbox/v1/forward"
-    params = {"access_token": mapbox_token, "q": name, "proximity": proximity, 'types': 'poi', 'poi_category': 'tourist_attraction,museum,monument,historic,park,church,place_of_worship'}
-    
-    res = requests.get(mapbox_url, params=params)
-    print(f'res.json {res.json()}')
+    # Nominatim API endpoint
+    nominatim_url = "https://nominatim.openstreetmap.org/search"
+    params = {"q": name, "format": "json", "limit": 1  }
+    headers = {
+    "User-Agent": "Mozilla/5.0 (compatible; AcmeInc/1.0)"  # Use your app's name and version
+    }
+
+    res = requests.get(nominatim_url, params=params, headers=headers)
+
     if res.status_code != 200:
         return []
-    
+        
     try:
-        return res.json()['features'][0]
+        return res.json()
     except Exception as e:
         print(f"Error retrieving landmark: {e}")
         return []
@@ -140,7 +163,7 @@ def lmchain():
     
     llm = CloudflareWorkersAI(account_id=cf_account_id, api_token=cf_api_token, model='@cf/meta/llama-3.1-8b-instruct',)
     prompt = PromptTemplate(
-        template="""Return a comma-separated list of the 7 best landmarks in {city}. Only return the list. {form_instructions}""",
+        template="""Return a comma-separated list of the 10 best landmarks in {city}. Only return the list. {form_instructions}""",
         input_variables=["city"],
         partial_variables={"form_instructions": form_instructions},
     )
@@ -157,8 +180,13 @@ def get_landmarks(landmarks, long_city, lat_city):
         if not features:
             continue
         
-        coor = features['geometry']['coordinates']
-        long, lat = coor
+        # coor = features['geometry']['coordinates']
+        # long, lat = coor
+        print("features", features[0])
+        lat = features[0].get('lat')
+        long = features[0].get('lon')
+    
+        
         dist = distance.distance((lat_city, long_city), (lat, long)).km
         
         if dist <= 7:
@@ -321,8 +349,8 @@ if city_id:
         long, lat = coords
         landmarks = lmchain().run({"city": city['properties']['full_address']})
         
-        if 'landmark_locations' not in st.session_state:
-            st.session_state.landmark_locations = get_landmarks(landmarks, long, lat)
+        # if 'landmark_locations' not in st.session_state:
+        st.session_state.landmark_locations = get_landmarks(landmarks, long, lat)
 
         user_inp = st.data_editor(
             st.session_state.landmark_locations,
@@ -340,9 +368,8 @@ if city_id:
         output, optimized_coords = travelingsalesman(selected_landmarks)
         if output is not None and optimized_coords:
             dist = output['trips'][0]['distance']
-            conv_fac = 0.000621371
-            miles = dist * conv_fac
-            st.write(f"Total distance: {miles:.3f} mi")
+            dist_km = dist / 1000
+            st.write(f"Total distance: {dist_km:.2f} km")
             
             waypoints = [wp['waypoint_index'] for wp in output['waypoints']]
             stops = selected_landmarks.iloc[waypoints, :]
@@ -353,7 +380,7 @@ if city_id:
             # Display the route map
             folium_static(st.session_state.route_map)
             
-            st.button('Generate route!', on_click=lambda: gen_route(city, stops))
+            st.button('Generate details about the route!', on_click=lambda: gen_route(city, stops))
         else:
             st.error("Unable to generate the optimized route. Please try again or select different landmarks.")
 
@@ -381,12 +408,3 @@ if 'route' in st.session_state and st.session_state.route:
         mime='text/html'
     )
 st.markdown('</div>', unsafe_allow_html=True)
-# Footer HTML
-footer_html = """
-    <div class="footer">
-        Made with ❤️ in SF🌉
-    </div>
-"""
-
-# Inject the footer into the app
-st.markdown(footer_html, unsafe_allow_html=True)
