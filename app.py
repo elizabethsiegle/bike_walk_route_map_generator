@@ -18,7 +18,7 @@ from folium.plugins import Draw
 from streamlit_folium import folium_static
 
 # Display the title and description
-st.title('Route Me🚴‍♀️🚶‍♀️‍➡️🏃‍♀️')
+st.title('City Wanderer 🚴‍♂️🏃‍♂️🚶‍♀️‍➡️')
 
 st.markdown("""
     <style>
@@ -33,6 +33,7 @@ st.markdown("""
             color: #000;
             font-size: 14px;
             box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+            z-index: 1000;
         }
         .content {
             padding-bottom: 150px; /* Adjust this value to create space between content and footer */
@@ -42,7 +43,7 @@ st.markdown("""
 # Footer HTML
 footer_html = """
     <div class="footer">
-        Made with ❤️ in SF🌉 with Cloudflare Workers AI ➡️ 👩🏻‍💻 <a href="https://github.com/elizabethsiegle/bike_walk_route_map_generator">code here on GitHub</a>
+        Made with ❤️ at DigiLabs👨‍💻
     </div>
 """
 
@@ -51,48 +52,66 @@ st.markdown(footer_html, unsafe_allow_html=True)
 
 # Define markdown content directly
 markdown_content = """
-This app uses [Cloudflare Workers AI](https://developers.cloudflare.com/workers-ai/), [LangChain](https://langchain.dev/),  landmark/city data from Mapbox, [Folium](https://python-visualization.github.io/folium/latest/) for visualizing maps and routes, and [Streamlit](https://streamlit.io/)/[Streamlit Folium](https://folium.streamlit.app/) to tackle the Traveling Salesman problem!
 
-1. Enter a city🏙️ you wish to visit
--> get a few must-visit landmarks in your chosen city
-2. Pick the landmarks🌁🗽 you want to visit.
-3. Generate the shortest path between these landmarks.
-4. Explore! 🗺️
+**City Wanderer** is your perfect companion for exploring new cities. Pick a city, choose landmarks you'd love to visit, and let the app create the best route for your adventure. Whether you're walking, biking, or just curious, City Wanderer will guide you through the city's must-see spots in the most efficient way. Discover hidden gems, save time, and enjoy the journey!
+
+### How to Use the City Wanderer App
+
+1. Choose a City 🏙️  
+2. Select Landmarks 🏛️  
+3. Generate Your Route 🛣️
+4. Get detailed descriptions of the selected landmarks using AI. 🤖
+5. Start Your Adventure! 🚀
 """
 st.markdown(markdown_content)
 
+# with st.expander("Learn More"):
+#     st.markdown("""
+#     This app uses:
+#     - [Cloudflare Workers AI](https://developers.cloudflare.com/workers-ai/) for intelligent processing
+#     - [LangChain](https://langchain.dev/) for managing language models
+#     - Landmark and city data from [Nominatim](https://nominatim.openstreetmap.org/)
+#     - [Mapbox](https://www.mapbox.com/) for mapping and location services
+#     - [Folium](https://python-visualization.github.io/folium/latest/) for visualizing maps and routes
+#     - [Streamlit](https://streamlit.io/) and [Streamlit Folium](https://folium.streamlit.app/) for building the app interface and solving the traveling salesman problem.
+#     """)
+
+
 # Load environment variables
-load_dotenv()
-mapbox_token = st.secrets["MAPBOX_TOKEN"] # os.environ.get('MAPBOX_TOKEN')
-cf_account_id = st.secrets["CLOUDFLARE_ACCOUNT_ID"]# os.environ.get('CLOUDFLARE_ACCOUNT_ID')
-cf_api_token = st.secrets["CLOUDFLARE_API_TOKEN"] # os.environ.get('CLOUDFLARE_API_TOKEN')
+load_dotenv('.local.env')
+
+# mapbox_token = st.secrets["MAPBOX_TOKEN"] # os.environ.get('MAPBOX_TOKEN')
+# cf_account_id = st.secrets["CLOUDFLARE_ACCOUNT_ID"]# os.environ.get('CLOUDFLARE_ACCOUNT_ID')
+# cf_api_token = st.secrets["CLOUDFLARE_API_TOKEN"] # os.environ.get('CLOUDFLARE_API_TOKEN')
+
+mapbox_token = os.getenv('MAPBOX_TOKEN')
+cf_account_id = os.getenv('CLOUDFLARE_ACCOUNT_ID')
+cf_api_token = os.getenv('CLOUDFLARE_API_TOKEN')
 
 token = str(uuid.uuid4())
 
 # find cities
 def find_city(city_inp: str) -> List[tuple]:
+    
     if len(city_inp) < 3:
         return []
     
-    # searchbox api = return list of suggestions for city
-    url = "https://api.mapbox.com/search/searchbox/v1/suggest"
-    params = {"q": city_inp, "access_token": mapbox_token, "session_token": token, "types": "place"}
-    
-    res = requests.get(url, params=params)
-    if res.status_code != 200:
-        return []
-    
-    try:
-        suggestions = res.json().get('suggestions', [])
-        results = []
-        for s in suggestions:
-            print(f"s[name] {s['name']} s[place_formatted] {s['place_formatted']}")
-            results.append((f"{s['name']}, {s['place_formatted']}", s['mapbox_id']))
+    with st.spinner('Fetching city suggestions...'):
+        url = "https://api.mapbox.com/search/searchbox/v1/suggest"
+        params = {"q": city_inp, "access_token": mapbox_token, "session_token": token, "types": "place"}
+        
+        try:
+            res = requests.get(url, params=params)
+            res.raise_for_status()  # Will raise an HTTPError for bad responses (4xx and 5xx)
+            
+            suggestions = res.json().get('suggestions', [])
+            results = [(f"{s['name']}, {s['place_formatted']}", s['mapbox_id']) for s in suggestions]
+            
+            return results
+        except requests.RequestException as e:
+            st.error(f"Error fetching city suggestions: {e}")
+            return []
 
-        return results
-    except Exception as e:
-        st.error(f"Error fetching city suggestions: {e}")
-        return []
 
 # Function to retrieve city details
 @st.cache_data
@@ -107,24 +126,35 @@ def retrieve_city(id):
         if not features:
             st.warning("No features returned for the city.")
             return []
+        
         return features[0]
     except Exception as e:
         st.error(f"An error occurred: {e}")
         return []
 
-# Function to retrieve landmark details
 @st.cache_data
-def retrieve_landmark(name, proximity):
-    mapbox_url = "https://api.mapbox.com/search/searchbox/v1/forward"
-    params = {"access_token": mapbox_token, "q": name, "proximity": proximity, 'types': 'poi', 'poi_category': 'tourist_attraction,museum,monument,historic,park,church,place_of_worship'}
+def retrieve_landmark(name, city_bbox):
+    nominatim_url = "https://nominatim.openstreetmap.org/search"
     
-    res = requests.get(mapbox_url, params=params)
-    print(f'res.json {res.json()}')
+    min_lon, min_lat, max_lon, max_lat = city_bbox
+    
+    params = {
+        "q": name,
+        "format": "json",
+        "limit": 1,  # Adjust limit if more results are needed
+        "viewbox": f"{min_lon},{max_lat},{max_lon},{min_lat}",  # Bounding box in (min_lon, max_lat, max_lon, min_lat) format
+        "bounded": 1  # Restrict results to within the bounding box
+    }
+    headers = {
+        "User-Agent": "Mozilla/5.0 (compatible; AcmeInc/1.0)"  # Use your app's name and version
+    }
+    res = requests.get(nominatim_url, params=params, headers=headers)
+
     if res.status_code != 200:
         return []
-    
+
     try:
-        return res.json()['features'][0]
+        return res.json()
     except Exception as e:
         print(f"Error retrieving landmark: {e}")
         return []
@@ -140,7 +170,7 @@ def lmchain():
     
     llm = CloudflareWorkersAI(account_id=cf_account_id, api_token=cf_api_token, model='@cf/meta/llama-3.1-8b-instruct',)
     prompt = PromptTemplate(
-        template="""Return a comma-separated list of the 7 best landmarks in {city}. Only return the list. {form_instructions}""",
+        template="""Return a comma-separated list of the 10 best landmarks in {city}. Only return the list. {form_instructions}""",
         input_variables=["city"],
         partial_variables={"form_instructions": form_instructions},
     )
@@ -150,18 +180,22 @@ def lmchain():
 
 # Function to get landmark locations
 @st.cache_data
-def get_landmarks(landmarks, long_city, lat_city):
+def get_landmarks(landmarks, long_city, lat_city, city_bbox):
     data = []
     for lm in landmarks:
-        features = retrieve_landmark(lm, f"{long_city},{lat_city}")
+        features = retrieve_landmark(lm, city_bbox)
         if not features:
             continue
         
-        coor = features['geometry']['coordinates']
-        long, lat = coor
+        # coor = features['geometry']['coordinates']
+        # long, lat = coor
+        lat = features[0].get('lat')
+        long = features[0].get('lon')
+        
         dist = distance.distance((lat_city, long_city), (lat, long)).km
         
-        if dist <= 7:
+        # Include landmarks within 12 km from the city center
+        if dist <= 12:
             data.append([lm, long, lat, True])
     
     return pd.DataFrame(data=data, columns=['Name', 'longitude', 'latitude', 'Include'])
@@ -314,48 +348,55 @@ def create_route_map(landmarks, optimized_coords):
     return m
 
 # Update the main app logic
+def update_landmarks(edited_data):
+    st.session_state.landmark_locations = edited_data
+
+# Update the main app logic
 if city_id:
     city = retrieve_city(city_id)
+    
     if city:
         coords = city['geometry']['coordinates']
         long, lat = coords
-        landmarks = lmchain().run({"city": city['properties']['full_address']})
         
-        if 'landmark_locations' not in st.session_state:
-            st.session_state.landmark_locations = get_landmarks(landmarks, long, lat)
+        if 'landmark_locations' not in st.session_state or st.session_state.city_id != city_id:
+            landmarks = lmchain().run({"city": city['properties']['full_address']})
+            st.session_state.landmark_locations = get_landmarks(landmarks, long, lat, city['properties']['bbox'])
+            st.session_state.city_id = city_id
 
-        user_inp = st.data_editor(
+        edited_landmarks = st.data_editor(
             st.session_state.landmark_locations,
             hide_index=True,
             disabled=('Name', 'longitude', 'latitude'),
             column_config={'longitude': None, 'latitude': None},
-            key='user_input',
-            use_container_width=True
+            key='landmark_editor',
+            use_container_width=True,
+            on_change=update_landmarks,
+            args=(st.session_state.landmark_locations,)
         )
 
-        st.session_state.landmark_locations.update(user_inp)
-
-        selected_landmarks = st.session_state.landmark_locations[st.session_state.landmark_locations['Include']]
+        selected_landmarks = edited_landmarks[edited_landmarks['Include']]
         
-        output, optimized_coords = travelingsalesman(selected_landmarks)
-        if output is not None and optimized_coords:
-            dist = output['trips'][0]['distance']
-            conv_fac = 0.000621371
-            miles = dist * conv_fac
-            st.write(f"Total distance: {miles:.3f} mi")
-            
-            waypoints = [wp['waypoint_index'] for wp in output['waypoints']]
-            stops = selected_landmarks.iloc[waypoints, :]
-            
-            # Store the route map in session state
-            st.session_state.route_map = create_route_map(stops, optimized_coords)
-            
-            # Display the route map
-            folium_static(st.session_state.route_map)
-            
-            st.button('Generate route!', on_click=lambda: gen_route(city, stops))
+        if len(selected_landmarks) > 0:
+            output, optimized_coords = travelingsalesman(selected_landmarks)
+            if output is not None and optimized_coords:
+                dist = output['trips'][0]['distance']
+                dist_km = dist / 1000
+                st.write(f"Total distance: {dist_km:.2f} km")
+                
+                waypoints = [wp['waypoint_index'] for wp in output['waypoints']]
+                stops = selected_landmarks.iloc[waypoints, :]
+                
+                st.session_state.route_map = create_route_map(stops, optimized_coords)
+                folium_static(st.session_state.route_map)
+                
+                st.button('Generate details about the route!', on_click=lambda: gen_route(city, stops))
+            else:
+                st.error("Unable to generate the optimized route. Please try again or select different landmarks.")
         else:
-            st.error("Unable to generate the optimized route. Please try again or select different landmarks.")
+            st.warning("Please select at least one landmark to generate a route.")
+
+
 
 # Show generated route and offer map download
 if 'route' in st.session_state and st.session_state.route:
@@ -381,12 +422,3 @@ if 'route' in st.session_state and st.session_state.route:
         mime='text/html'
     )
 st.markdown('</div>', unsafe_allow_html=True)
-# Footer HTML
-footer_html = """
-    <div class="footer">
-        Made with ❤️ in SF🌉
-    </div>
-"""
-
-# Inject the footer into the app
-st.markdown(footer_html, unsafe_allow_html=True)
