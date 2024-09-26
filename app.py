@@ -18,7 +18,7 @@ from folium.plugins import Draw
 from streamlit_folium import folium_static
 
 # Display the title and description
-st.title('Route Minds🚴‍♀️🚶‍♀️‍➡️🏃‍♀️')
+st.title('City Wanderer 🚴‍♂️🏃‍♂️🚶‍♀️‍➡️')
 
 st.markdown("""
     <style>
@@ -52,15 +52,30 @@ st.markdown(footer_html, unsafe_allow_html=True)
 
 # Define markdown content directly
 markdown_content = """
-This app uses [Cloudflare Workers AI](https://developers.cloudflare.com/workers-ai/), [LangChain](https://langchain.dev/), landmark and city data from [Nominatim](https://nominatim.openstreetmap.org/), [Mapbox](https://www.mapbox.com/), and [Folium](https://python-visualization.github.io/folium/latest/) for visualizing maps and routes. With [Streamlit](https://streamlit.io/) and [Streamlit Folium](https://folium.streamlit.app/), the traveling salesman problem is solved.
 
-1. Choose a city🏙️ you want to visit.
-   -> Get suggestions for key landmarks.
-2. Determine the landmarks🌁🗽 you want to visit.
-3. Generate the optimal route between these locations.
-4. Start your discovery journey! 🗺️
+**City Wanderer** is your perfect companion for exploring new cities. Pick a city, choose landmarks you'd love to visit, and let the app create the best route for your adventure. Whether you're walking, biking, or just curious, City Wanderer will guide you through the city's must-see spots in the most efficient way. Discover hidden gems, save time, and enjoy the journey!
+
+### How to Use the City Wanderer App
+
+1. Choose a City 🏙️  
+2. Select Landmarks 🏛️  
+3. Generate Your Route 🛣️
+4. Get detailed descriptions of the selected landmarks using AI. 🤖
+5. Start Your Adventure! 🚀
 """
 st.markdown(markdown_content)
+
+# with st.expander("Learn More"):
+#     st.markdown("""
+#     This app uses:
+#     - [Cloudflare Workers AI](https://developers.cloudflare.com/workers-ai/) for intelligent processing
+#     - [LangChain](https://langchain.dev/) for managing language models
+#     - Landmark and city data from [Nominatim](https://nominatim.openstreetmap.org/)
+#     - [Mapbox](https://www.mapbox.com/) for mapping and location services
+#     - [Folium](https://python-visualization.github.io/folium/latest/) for visualizing maps and routes
+#     - [Streamlit](https://streamlit.io/) and [Streamlit Folium](https://folium.streamlit.app/) for building the app interface and solving the traveling salesman problem.
+#     """)
+
 
 # Load environment variables
 load_dotenv('.local.env')
