@@ -171,7 +171,7 @@ def lmchain():
     
     llm = CloudflareWorkersAI(account_id=cf_account_id, api_token=cf_api_token, model='@cf/meta/llama-3.1-8b-instruct',)
     prompt = PromptTemplate(
-        template="""Return a comma-separated list of the 20 best landmarks in {city}. Only return the list. {form_instructions}""",
+        template="""Return a comma-separated list of the 10 best landmarks in {city}. Only return the list. {form_instructions}""",
         input_variables=["city"],
         partial_variables={"form_instructions": form_instructions},
     )
@@ -349,48 +349,55 @@ def create_route_map(landmarks, optimized_coords):
     return m
 
 # Update the main app logic
+def update_landmarks(edited_data):
+    st.session_state.landmark_locations = edited_data
+
+# Update the main app logic
 if city_id:
     city = retrieve_city(city_id)
     
     if city:
         coords = city['geometry']['coordinates']
         long, lat = coords
-        landmarks = lmchain().run({"city": city['properties']['full_address']})
         
-        # if 'landmark_locations' not in st.session_state:
-        st.session_state.landmark_locations = get_landmarks(landmarks, long, lat, city['properties']['bbox'])
+        if 'landmark_locations' not in st.session_state or st.session_state.city_id != city_id:
+            landmarks = lmchain().run({"city": city['properties']['full_address']})
+            st.session_state.landmark_locations = get_landmarks(landmarks, long, lat, city['properties']['bbox'])
+            st.session_state.city_id = city_id
 
-        user_inp = st.data_editor(
+        edited_landmarks = st.data_editor(
             st.session_state.landmark_locations,
             hide_index=True,
             disabled=('Name', 'longitude', 'latitude'),
             column_config={'longitude': None, 'latitude': None},
-            key='user_input',
-            use_container_width=True
+            key='landmark_editor',
+            use_container_width=True,
+            on_change=update_landmarks,
+            args=(st.session_state.landmark_locations,)
         )
 
-        st.session_state.landmark_locations.update(user_inp)
-
-        selected_landmarks = st.session_state.landmark_locations[st.session_state.landmark_locations['Include']]
+        selected_landmarks = edited_landmarks[edited_landmarks['Include']]
         
-        output, optimized_coords = travelingsalesman(selected_landmarks)
-        if output is not None and optimized_coords:
-            dist = output['trips'][0]['distance']
-            dist_km = dist / 1000
-            st.write(f"Total distance: {dist_km:.2f} km")
-            
-            waypoints = [wp['waypoint_index'] for wp in output['waypoints']]
-            stops = selected_landmarks.iloc[waypoints, :]
-            
-            # Store the route map in session state
-            st.session_state.route_map = create_route_map(stops, optimized_coords)
-            
-            # Display the route map
-            folium_static(st.session_state.route_map)
-            
-            st.button('Generate details about the route!', on_click=lambda: gen_route(city, stops))
+        if len(selected_landmarks) > 0:
+            output, optimized_coords = travelingsalesman(selected_landmarks)
+            if output is not None and optimized_coords:
+                dist = output['trips'][0]['distance']
+                dist_km = dist / 1000
+                st.write(f"Total distance: {dist_km:.2f} km")
+                
+                waypoints = [wp['waypoint_index'] for wp in output['waypoints']]
+                stops = selected_landmarks.iloc[waypoints, :]
+                
+                st.session_state.route_map = create_route_map(stops, optimized_coords)
+                folium_static(st.session_state.route_map)
+                
+                st.button('Generate details about the route!', on_click=lambda: gen_route(city, stops))
+            else:
+                st.error("Unable to generate the optimized route. Please try again or select different landmarks.")
         else:
-            st.error("Unable to generate the optimized route. Please try again or select different landmarks.")
+            st.warning("Please select at least one landmark to generate a route.")
+
+
 
 # Show generated route and offer map download
 if 'route' in st.session_state and st.session_state.route:
