@@ -117,22 +117,6 @@ def retrieve_city(id):
         st.error(f"An error occurred: {e}")
         return []
 
-# Function to retrieve landmark details
-# @st.cache_data
-# def retrieve_landmark(name, proximity):
-#     mapbox_url = "https://api.mapbox.com/search/searchbox/v1/forward"
-#     params = {"access_token": mapbox_token, "q": name, "proximity": proximity, 'types': 'poi', 'poi_category': 'tourist_attraction,museum,monument,historic,park,church,place_of_worship'}
-    
-#     res = requests.get(mapbox_url, params=params)
-#     if res.status_code != 200:
-#         return []
-    
-#     try:
-#         return res.json()['features'][0]
-#     except Exception as e:
-#         print(f"Error retrieving landmark: {e}")
-#         return []
-
 @st.cache_data
 def retrieve_landmark(name, city_bbox):
     nominatim_url = "https://nominatim.openstreetmap.org/search"
@@ -195,7 +179,7 @@ def get_landmarks(landmarks, long_city, lat_city, city_bbox):
         
         dist = distance.distance((lat_city, long_city), (lat, long)).km
         
-        # Include landmarks within 10 km from the city center
+        # Include landmarks within 12 km from the city center
         if dist <= 12:
             data.append([lm, long, lat, True])
     
